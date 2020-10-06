@@ -15,13 +15,15 @@
 package model
 
 import (
-	"github.com/pkg/errors"
+	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Status
 const (
-	StatusDone = iota
+	StatusDone JobStatus = iota
 	StatusPending
 	StatusProcessing
 	StatusFailure
@@ -47,8 +49,7 @@ type Job struct {
 	InputParameters InputParameters `json:"inputParameters" bson:"input_parameters"`
 
 	// Enumerated status of the Job and string field used for unmarshalling
-	Status       int    `json:"-" bson:"status"`
-	StatusString string `json:"status" bson:"-"`
+	Status JobStatus `json:"-" bson:"status"`
 
 	// Results produced by a finished job. If status is not "done" this
 	// field will always be nil.
@@ -136,20 +137,41 @@ func (job *Job) Validate(workflow *Workflow) error {
 	return nil
 }
 
-// StatusToString returns the job's status as a string
-func StatusToString(status int) string {
-	var ret string
-	switch status {
+type JobStatus int
+
+// String returns the JobStatus as a string
+func (stat JobStatus) String() string {
+	switch stat {
 	case StatusPending:
-		ret = "pending"
+		return "pending"
 	case StatusProcessing:
-		ret = "processing"
+		return "processing"
 	case StatusDone:
-		ret = "done"
+		return "done"
 	case StatusFailure:
-		ret = "failed"
-	default:
-		ret = "unknown"
+		return "failed"
 	}
-	return ret
+	return "unknown"
+}
+
+func (stat JobStatus) MarshalJSON() ([]byte, error) {
+	return []byte(stat.String()), nil
+}
+
+// UnmarshalJSON converts the string JSON value to a valid status.
+func (stat JobStatus) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	switch {
+	case strings.EqualFold(str, "pending"):
+		stat = StatusPending
+	case strings.EqualFold(str, "processing"):
+		stat = StatusProcessing
+	case strings.EqualFold(str, "done"):
+		stat = StatusDone
+	case strings.EqualFold(str, "failure"):
+		stat = StatusFailure
+	default:
+		stat = -1
+	}
+	return nil
 }

@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/mendersoftware/go-lib-micro/config"
-	"github.com/mendersoftware/workflows/model"
 	"github.com/urfave/cli"
 	"log"
 	"os"
@@ -194,7 +193,7 @@ func cmdListJobs(args *cli.Context) error {
 		count, page, count/perPage, perPage, "insert time", "id", "status", "workflow")
 	for _, j := range jobs {
 		format := "Mon, 2 Jan 2006 15:04:05 MST"
-		fmt.Printf("%29s %24s %10s %s\n", j.InsertTime.Format(format), j.ID, model.StatusToString(j.Status), j.WorkflowName)
+		fmt.Printf("%29s %24s %10s %s\n", j.InsertTime.Format(format), j.ID, j.Status.String(), j.WorkflowName)
 	}
 	fmt.Printf("all jobs: %d; page: %d/%d\n", count, page, count/perPage)
 

@@ -41,6 +41,6 @@ type DataStore interface {
 	GetAllJobs(ctx context.Context, page int64, perPage int64) ([]model.Job, int64, error)
 	AcquireJob(ctx context.Context, job *model.Job) (*model.Job, error)
 	UpdateJobAddResult(ctx context.Context, job *model.Job, result *model.TaskResult) error
-	UpdateJobStatus(ctx context.Context, job *model.Job, status int) error
+	UpdateJobStatus(ctx context.Context, job *model.Job, status model.JobStatus) error
 	GetJobByNameAndID(ctx context.Context, name string, ID string) (*model.Job, error)
 }

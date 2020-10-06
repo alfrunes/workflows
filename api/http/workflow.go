@@ -189,6 +189,5 @@ func (h WorkflowController) GetWorkflowByNameAndID(c *gin.Context) {
 		return
 	}
 
-	job.StatusString = model.StatusToString(job.Status)
 	c.JSON(http.StatusOK, job)
 }
