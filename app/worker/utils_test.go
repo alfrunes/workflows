@@ -52,13 +52,13 @@ func TestProcessJobString(t *testing.T) {
 	assert.Equal(t, "_default_", res)
 
 	options := &processor.Options{
-		Encoding: processor.URL,
+		Encoding: processor.EncodingURL,
 	}
 	res = ps.ProcessJobString("_${workflow.input.key}_", options)
 	assert.Equal(t, "_test%2Btest_", res)
 
 	options = &processor.Options{
-		Encoding: processor.URL,
+		Encoding: processor.EncodingURL,
 	}
 	res = ps.ProcessJobString("_${encoding=plain;workflow.input.key}_", options)
 	assert.Equal(t, "_test+test_", res)

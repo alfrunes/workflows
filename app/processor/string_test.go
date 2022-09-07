@@ -24,20 +24,20 @@ func TestGetOption(t *testing.T) {
 	var expectedOption *Options
 	var o Options
 
-	expectedOption = &Options{Encoding: Plain}
+	expectedOption = &Options{Encoding: EncodingPlain}
 	o = getOption()
 	assert.Equal(t, *expectedOption, o)
 
-	expectedOption = &Options{Encoding: Plain}
+	expectedOption = &Options{Encoding: EncodingPlain}
 	o = getOption(expectedOption)
 	assert.Equal(t, *expectedOption, o)
 
-	expectedOption = &Options{Encoding: URL}
+	expectedOption = &Options{Encoding: EncodingURL}
 	o = getOption(expectedOption)
 	assert.Equal(t, *expectedOption, o)
 
-	expectedOption = &Options{Encoding: URL}
-	o = getOption(expectedOption, &Options{Encoding: Plain})
+	expectedOption = &Options{Encoding: EncodingURL}
+	o = getOption(expectedOption, &Options{Encoding: EncodingPlain})
 	assert.Equal(t, *expectedOption, o)
 }
 
@@ -48,29 +48,29 @@ func TestEncodingFromData(t *testing.T) {
 
 	setEncoding = plainEncodingFlag
 	data = "${encoding=" + setEncoding + ";workflow.input.variable0}"
-	data, encoding = getEncodingFromData(data, URL)
+	data, encoding = getEncodingFromData(data, EncodingURL)
 	assert.Equal(t, "workflow.input.variable0", data)
-	assert.Equal(t, Plain, encoding)
+	assert.Equal(t, EncodingPlain, encoding)
 
 	setEncoding = urlEncodingFlag
 	data = "${encoding=" + setEncoding + ";workflow.input.variable0}"
-	data, encoding = getEncodingFromData(data, Plain)
+	data, encoding = getEncodingFromData(data, EncodingPlain)
 	assert.Equal(t, "workflow.input.variable0", data)
-	assert.Equal(t, URL, encoding)
+	assert.Equal(t, EncodingURL, encoding)
 
 	setEncoding = urlEncodingFlag
 	data = "${encoding=" + setEncoding + ";workflow.input.variable0}"
-	data, encoding = getEncodingFromData(data, URL)
+	data, encoding = getEncodingFromData(data, EncodingURL)
 	assert.Equal(t, "workflow.input.variable0", data)
-	assert.Equal(t, URL, encoding)
+	assert.Equal(t, EncodingURL, encoding)
 
 	data = "${workflow.input.variable0}"
-	data, encoding = getEncodingFromData(data, URL)
+	data, encoding = getEncodingFromData(data, EncodingURL)
 	assert.Equal(t, "${workflow.input.variable0}", data)
-	assert.Equal(t, URL, encoding)
+	assert.Equal(t, EncodingURL, encoding)
 
 	data = "${workflow.input.variable0}"
-	data, encoding = getEncodingFromData(data, Plain)
+	data, encoding = getEncodingFromData(data, EncodingPlain)
 	assert.Equal(t, "${workflow.input.variable0}", data)
-	assert.Equal(t, Plain, encoding)
+	assert.Equal(t, EncodingPlain, encoding)
 }

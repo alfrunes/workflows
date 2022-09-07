@@ -31,23 +31,27 @@ import (
 const (
 	workflowEnvVariable   = "env."
 	workflowInputVariable = "workflow.input."
-	regexVariable         = `\$\{([^\}\|]+)(?:\|([^\}]+))?}`
-	regexVariableFlags    = `(?:([a-zA-Z]+)+=([a-zA-Z0-9]+);)([^\}\|]+)(?:\|([^\}]+))?`
-	regexOutputVariable   = `(.*)\.json\.(.*)`
-	encodingFlag          = "encoding"
-	urlEncodingFlag       = "url"
-	plainEncodingFlag     = "plain"
+	regexVariable         = `\$\{(?P<options>(?:(?:[a-zA-Z]+)=(?:[a-zA-Z0-9]+);)*)` +
+		`(?P<name>[^;\}\|]+)(?:\|(?P<default>[^\}]+))?}`
+	regexOutputVariable = `(.*)\.json\.(.*)`
+	encodingFlag        = "encoding"
+	urlEncodingFlag     = "url"
 )
 
-var reExpression = regexp.MustCompile(regexVariable)
-var reExpressionOutput = regexp.MustCompile(regexOutputVariable)
-var reExpressionFlags = regexp.MustCompile(regexVariableFlags)
+var (
+	reExpression       = regexp.MustCompile(regexVariable)
+	reExpressionOutput = regexp.MustCompile(regexOutputVariable)
+
+	reMatchIndexOptions = reExpression.SubexpIndex("options")
+	reMatchIndexName    = reExpression.SubexpIndex("name")
+	reMatchIndexDefault = reExpression.SubexpIndex("default")
+)
 
 type Encoding int64
 
 const (
-	Plain Encoding = iota
-	URL
+	EncodingPlain Encoding = iota
+	EncodingURL
 )
 
 type JobStringProcessor struct {
@@ -69,84 +73,63 @@ func NewJobStringProcessor(
 	}
 }
 
-func getOption(options ...*Options) Options {
-	option := Options{Encoding: Plain}
-	for _, o := range options {
-		if o == nil {
-			continue
-		}
-		option.Encoding = o.Encoding
-		break
-	}
-	return option
-}
+func processOptionString(exp string) (opts Options) {
 
-func getEncodingFromData(data string, defaultEncoding Encoding) (string, Encoding) {
-	const (
-		expectedMatches      = 4
-		flagMatchIndex       = 1
-		flagValueMatchIndex  = 2
-		identifierMatchIndex = 3
-	)
-	matches := reExpressionFlags.FindAllStringSubmatch(data, -1)
-	for _, m := range matches {
-		if len(m) < expectedMatches {
-			continue
+	exp = strings.Trim(exp, ";")
+	i, j := 0, 0
+	for {
+		j = strings.Index(exp, exp[i:]) + 1
+		if i >= j {
+			break
 		}
-		if m[flagMatchIndex] == encodingFlag {
-			switch m[flagValueMatchIndex] {
-			case urlEncodingFlag:
-				return m[identifierMatchIndex], URL
-			case plainEncodingFlag:
-				return m[identifierMatchIndex], Plain
+		keyValue := strings.SplitN(exp[i:j], "=", 2)
+		if len(keyValue) == 2 {
+			switch keyValue[0] {
+			case encodingFlag:
+				if keyValue[1] == urlEncodingFlag {
+					opts.Encoding = EncodingURL
+				}
+
+			default:
+				// ignore
 			}
 		}
+		i = j
 	}
-	return data, defaultEncoding
+	return
 }
 
-func (j *JobStringProcessor) ProcessJobString(data string, options ...*Options) string {
+func (j *JobStringProcessor) ProcessJobString(data string) string {
 	matches := reExpression.FindAllStringSubmatch(data, -1)
-	option := getOption(options...)
 
 	// search for ${...} expressions in the data string
+SubMatchLoop:
 	for _, submatch := range matches {
 		// content of the ${...} expression, without the brackets
-		match := submatch[1]
+		varName := submatch[reMatchIndexName]
+		value := submatch[reMatchIndexDefault]
+		options := processOptionString(submatch[reMatchIndexOptions])
 		// now it is possible to override the encoding with flags: ${encoding=plain;identifier}
 		// if encoding is supplied via flags, it takes precedence, we return the match
 		// without the flags, otherwise fail back to original match and encoding
-		match, option.Encoding = getEncodingFromData(match, option.Encoding)
-		defaultValue := submatch[2]
-		if strings.HasPrefix(match, workflowInputVariable) &&
-			len(match) > len(workflowInputVariable) {
+		if strings.HasPrefix(varName, workflowInputVariable) &&
+			len(varName) > len(workflowInputVariable) {
 			// Replace ${workflow.input.KEY} with the KEY input variable
-			paramName := match[len(workflowInputVariable):]
-			found := false
+			paramName := varName[len(workflowInputVariable):]
 			for _, param := range j.job.InputParameters {
 				if param.Name == paramName {
-					value := param.Value
-					if option.Encoding == URL {
-						value = url.QueryEscape(value)
-					}
-					data = strings.ReplaceAll(data, submatch[0], value)
-					found = true
+					value = param.Value
 					break
 				}
 			}
-			if !found {
-				data = strings.ReplaceAll(data, submatch[0], defaultValue)
-			}
-		} else if strings.HasPrefix(match, workflowEnvVariable) &&
-			len(match) > len(workflowEnvVariable) {
+		} else if strings.HasPrefix(varName, workflowEnvVariable) &&
+			len(varName) > len(workflowEnvVariable) {
 			// Replace ${env.KEY} with the KEY environment variable
-			envName := match[len(workflowEnvVariable):]
-			envValue := os.Getenv(envName)
-			if envValue == "" {
-				envValue = defaultValue
+			envName := varName[len(workflowEnvVariable):]
+			if envValue := os.Getenv(envName); envValue != "" {
+				value = envValue
 			}
-			data = strings.ReplaceAll(data, submatch[0], envValue)
-		} else if output := reExpressionOutput.FindStringSubmatch(match); len(output) > 0 {
+		} else if output := reExpressionOutput.FindStringSubmatch(varName); len(output) > 0 {
 			// Replace ${TASK_NAME.json.JSONPATH} with the value of the JSONPATH expression from the
 			// JSON output of the previous task with name TASK_NAME. If the output is not a valid
 			// JSON or the JSONPATH does not resolve to a value, replace with empty string
@@ -167,15 +150,20 @@ func (j *JobStringProcessor) ProcessJobString(data string, options ...*Options) 
 					}
 					varValueString, err := utils.ConvertAnythingToString(varValue)
 					if err == nil {
-						if varValueString == "" {
-							varValueString = defaultValue
+						if varValueString != "" {
+							value = varValueString
 						}
-						data = strings.ReplaceAll(data, submatch[0], varValueString)
+					} else {
+						continue SubMatchLoop
 					}
 					break
 				}
 			}
 		}
+		if options.Encoding == EncodingURL {
+			value = url.QueryEscape(value)
+		}
+		data = strings.ReplaceAll(data, submatch[0], value)
 	}
 
 	return data

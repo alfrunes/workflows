@@ -46,12 +46,10 @@ func processHTTPTask(
 	jp *processor.JobProcessor,
 	l *log.Logger,
 ) (*model.TaskResult, error) {
-	options := &processor.Options{Encoding: processor.URL}
-	uri := ps.ProcessJobString(httpTask.URI, options)
-	l.Infof("processHTTPTask: starting with: method=%s uri=%s (options=%+v)",
+	uri := ps.ProcessJobString(httpTask.URI)
+	l.Infof("processHTTPTask: starting with: method=%s uri=%s",
 		httpTask.Method,
 		uri,
-		options,
 	)
 
 	var payloadString string
